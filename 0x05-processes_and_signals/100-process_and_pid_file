@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Executes multiple instructions
 
-echo $$ > /var/run/holbertonscript.pid
+echo "$$" > /var/run/holbertonscript.pid
 while true
 do
     echo "To infinity and beyond"
