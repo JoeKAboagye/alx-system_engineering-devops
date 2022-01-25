@@ -33,6 +33,7 @@ COMMIT
 
 # drop INVALID packets (logs these in loglevel medium and higher)
 -A ufw-before-input -m conntrack --ctstate INVALID -j ufw-logging-deny
+
 -A ufw-before-input -m conntrack --ctstate INVALID -j DROP
 
 # ok icmp codes for INPUT
