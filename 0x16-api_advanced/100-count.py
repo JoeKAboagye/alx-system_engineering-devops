@@ -1,51 +1,53 @@
 #!/usr/bin/python3
 """Recurse function definition"""
+import json
 import requests
 
 
-def count_words(subreddit, word_list):
-    """count_words function to return printed word counts"""
-    countDict = word_count(subreddit, word_list)
-    for key in [v[0] for v in
-                sorted(countDict.items(), key=lambda kv: (-kv[1], kv[0]))]:
-        if countDict[key] > 0:
-            print("{}: {}".format(key, countDict[key]))
+def count_words(subreddit, word_list, after="", count=[]):
+    """count all words"""
 
+    if after == "":
+        count = [0] * len(word_list)
 
-def word_count(subreddit, word_list, after=None, countDict={}):
-    """
-    Recurse function recursively produces a list of all hot articles
-    on a subreddit
-    """
-    subRcheck = requests.get("https://reddit.com/api/search_reddit_names.json",
-                             headers={
-                                 'User-Agent': 'Safari 12.1'
-                             },
-                             params={
-                                 'exact': True,
-                                 'query': subreddit
-                             })
-    if 'error' in subRcheck.json().keys():
-        pass
-    response = requests.get("https://reddit.com/r/{}.json"
-                            .format(subreddit),
-                            headers={
-                                'User-Agent': 'Safari 12.1'
-                            },
-                            params={
-                                'after': after
-                            })
-    """Create dictionary for count record"""
-    for child in response.json().get('data').get('children'):
-        for word in child.get('data').get('title').split():
-            for wordList in word_list:
-                if wordList not in countDict.keys():
-                    countDict[wordList] = 0
-                if word.upper() == wordList.upper():
-                    countDict[wordList] += 1
-    if response.json().get('data').get('after') is None:
-        return countDict
-    return word_count(subreddit,
-                      word_list,
-                      response.json().get('data').get('after'),
-                      countDict)
+    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
+    request = requests.get(url,
+                           params={'after': after},
+                           allow_redirects=False,
+                           headers={'user-agent': 'bhalut'})
+
+    if request.status_code == 200:
+        data = request.json()
+
+        for topic in (data['data']['children']):
+            for word in topic['data']['title'].split():
+                for i in range(len(word_list)):
+                    if word_list[i].lower() == word.lower():
+                        count[i] += 1
+
+        after = data['data']['after']
+        if after is None:
+            save = []
+            for i in range(len(word_list)):
+                for j in range(i + 1, len(word_list)):
+                    if word_list[i].lower() == word_list[j].lower():
+                        save.append(j)
+                        count[i] += count[j]
+
+            for i in range(len(word_list)):
+                for j in range(i, len(word_list)):
+                    if (count[j] > count[i] or
+                            (word_list[i] > word_list[j] and
+                             count[j] == count[i])):
+                        aux = count[i]
+                        count[i] = count[j]
+                        count[j] = aux
+                        aux = word_list[i]
+                        word_list[i] = word_list[j]
+                        word_list[j] = aux
+
+            for i in range(len(word_list)):
+                if (count[i] > 0) and i not in save:
+                    print("{}: {}".format(word_list[i].lower(), count[i]))
+        else:
+            count_words(subreddit, word_list, after, count)
