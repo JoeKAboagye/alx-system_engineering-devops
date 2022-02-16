@@ -2,37 +2,48 @@
 """Recurse function definition"""
 import json
 import requests
+import re
 
 
-def count_words(subreddit, word_list, after="", count=[]):
-    """count all words"""
+def count_words(subreddit, word_list, hot_list=[], after=None):
+    """parses the title of all hot articles"""
+    URL = 'http://reddit.com/r/{}/hot.json'.format(subreddit)
+    HEADERS = {'User-agent': 'Safari 12.1'}
+    params = {'limit': 100}
+    if isinstance(after, str):
+        if after != "STOP":
+            params['after'] = after
+        else:
+            return print_results(word_list, hot_list)
 
-    if after == "":
-        count = [0] * len(word_list)
+    response = requests.get(URL, headers=HEADERS, params=params)
+    posts = response.json().get('data', {}).get('children', {})
+    if response.status_code != 200 or not posts:
+        return None
+    data = response.json().get('data', {})
+    after = data.get('after', 'STOP')
+    if not after:
+        after = "STOP"
+    hot_list = hot_list + [post.get('data', {}).get('title')
+                           for post in data.get('children', [])]
+    return count_words(subreddit, word_list, hot_list, after)
 
-    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    request = requests.get(url,
-                           params={'after': after},
-                           allow_redirects=False,
-                           headers={'user-agent': 'Safari 12.1'})
 
-    if request.status_code == 200:
-        data = request.json()
+def print_results(word_list, hot_list):
+    '''Prints'''
+    count = {}
+    for word in word_list:
+        count[word] = 0
+    for title in hot_list:
+        for word in word_list:
+            count[word] = count[word] +\
+             len(re.findall(r'(?:^| ){}(?:$| )'.format(word), title, re.I))
 
-        for topic in (data['data']['children']):
-            for word in topic['data']['title'].split():
-                for i in range(len(word_list)):
-                    if word_list[i].lower() == word.lower():
-                        count[i] += 1
-
-        after = data['data']['after']
-        if after is None:
-            save = []
-            for i in range(len(word_list)):
-                for j in range(i + 1, len(word_list)):
-                    if word_list[i].lower() == word_list[j].lower():
-                        save.append(j)
-                        count[i] += count[j]
+    count = {k: v for k, v in count.items() if v > 0}
+    words = sorted(list(count.keys()))
+    for word in sorted(words,
+                       reverse=True, key=lambda k: count[k]):
+        print("{}: {}".format(word, count[word]))
 
             for i in range(len(word_list)):
                 for j in range(i, len(word_list)):
